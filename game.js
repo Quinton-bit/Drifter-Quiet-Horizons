@@ -12,7 +12,6 @@ let spawnPoint = {
   y: canvas.height - GROUND_HEIGHT - 50
 };
 
-// PLAYER
 let player = {
   x: spawnPoint.x,
   y: spawnPoint.y,
@@ -23,7 +22,6 @@ let player = {
   size: 20,
   onGround: false
 };
-
 
 let keys = {};
 window.addEventListener("keydown", e => keys[e.key] = true);
@@ -36,11 +34,14 @@ for (let i = 0; i < 80; i++) {
     y: Math.random() * canvas.height,
     size: Math.random() * 2 + 1,
     speed: 0.01
-
   });
 }
 
-// CLOUDS
+let parallaxLayers = [
+  { speed: 0.01, color: "rgba(255,255,255,0.05)", offset: 0 },
+  { speed: 0.03, color: "rgba(255,255,255,0.08)", offset: 0 }
+];
+
 let clouds = [];
 for (let i = 0; i < 6; i++) {
   clouds.push({
@@ -53,55 +54,53 @@ for (let i = 0; i < 6; i++) {
   });
 }
 
-// ISLANDS
 let islands = [
   { x: 300, y: 200, w: 200, h: 120, color: "#4a6fa5" },
   { x: 800, y: 400, w: 250, h: 150, color: "#5b8bbd" },
   { x: 1200, y: 250, w: 180, h: 100, color: "#6fa8dc" }
 ];
 
-// UPDATE LOOP
 function update() {
+  // gravity + movement
+  player.vy += GRAVITY;
 
-  // PLAYER MOVEMENT
-  // APPLY GRAVITY
-player.vy += GRAVITY;
+  if (keys["a"]) player.vx -= player.speed;
+  if (keys["d"]) player.vx += player.speed;
 
-// LEFT / RIGHT MOVEMENT
-if (keys["a"]) player.vx -= player.speed;
-if (keys["d"]) player.vx += player.speed;
-
-// JUMP
-if (keys["w"] && player.onGround) {
-  player.vy = -10;
-  player.onGround = false;
-}
-
-// APPLY FRICTION
-player.vx *= player.friction;
-
-// UPDATE POSITION
-player.x += player.vx;
-player.y += player.vy;
-
-// GROUND COLLISION
-let groundY = canvas.height - GROUND_HEIGHT;
-
-if (player.y + player.size > groundY) {
-  player.y = groundY - player.size;
-  player.vy = 0;
-  player.onGround = true;
-}
-// STAR MOVEMENT (parallax)
-for (let s of stars) {
-  s.x += s.speed;
-  if (s.x > canvas.width) {
-    s.x = 0;
-    s.y = Math.random() * canvas.height;
+  if (keys["w"] && player.onGround) {
+    player.vy = -10;
+    player.onGround = false;
   }
-}
 
-  // CLOUD MOVEMENT
+  player.vx *= player.friction;
+  player.x += player.vx;
+  player.y += player.vy;
+
+  let groundY = canvas.height - GROUND_HEIGHT;
+  if (player.y + player.size > groundY) {
+    player.y = groundY - player.size;
+    player.vy = 0;
+    player.onGround = true;
+  }
+
+  // stars movement
+  for (let s of stars) {
+    s.x += s.speed;
+    if (s.x > canvas.width) {
+      s.x = 0;
+      s.y = Math.random() * canvas.height;
+    }
+  }
+
+  // parallax mist movement
+  for (let layer of parallaxLayers) {
+    layer.offset += layer.speed;
+    if (layer.offset > canvas.width) {
+      layer.offset = 0;
+    }
+  }
+
+  // clouds
   for (let cloud of clouds) {
     cloud.x += cloud.speed;
     if (cloud.x > canvas.width + cloud.w) {
@@ -110,26 +109,24 @@ for (let s of stars) {
     }
   }
 
-  // ISLAND DRIFT
+  // islands drift
   for (let island of islands) {
     island.x += Math.sin(Date.now() / 2000) * 0.1;
   }
 }
+
 function drawPlayer() {
   ctx.save();
 
-  // body
   ctx.fillStyle = "#a03320";
   ctx.beginPath();
   ctx.ellipse(player.x, player.y, 20, 14, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // head
   ctx.beginPath();
   ctx.ellipse(player.x, player.y - 18, 14, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ears
   ctx.beginPath();
   ctx.moveTo(player.x - 10, player.y - 22);
   ctx.lineTo(player.x - 4, player.y - 32);
@@ -145,45 +142,40 @@ function drawPlayer() {
   ctx.restore();
 }
 
-// DRAW LOOP
 function draw() {
- ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // BACKGROUND
-  
-  // BACKGROUND GRADIENT
-let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-gradient.addColorStop(0, "#0f1c33");  // top color
-gradient.addColorStop(1, "#1a2a4a");  // bottom color
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-ctx.fillStyle = gradient;
-ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // background gradient
+  let gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, "#0f1c33");
+  gradient.addColorStop(1, "#1a2a4a");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // parallax mist
+  for (let layer of parallaxLayers) {
+    ctx.fillStyle = layer.color;
+    ctx.fillRect(layer.offset, 0, canvas.width, canvas.height);
+  }
 
-  // GROUND
-ctx.fillStyle = "#2e3b55";
-ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
-  
-// CLOUDS
+  // ground
+  ctx.fillStyle = "#2e3b55";
+  ctx.fillRect(0, canvas.height - GROUND_HEIGHT, canvas.width, GROUND_HEIGHT);
+
+  // clouds
   for (let cloud of clouds) {
     ctx.fillStyle = `rgba(255, 255, 255, ${cloud.opacity})`;
     ctx.beginPath();
     ctx.ellipse(cloud.x, cloud.y, cloud.w, cloud.h, 0, 0, Math.PI * 2);
     ctx.fill();
-  }// CLEAR CANVAS   
-  
-let stars = [];
-for (let i = 0; i < 80; i++) {
-  stars.push({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    size: Math.random() * 1 + 1,
-    speed: 0.01
-  });
-}
+  }
 
-  // ISLANDS
+  // islands with depth scale
   for (let island of islands) {
     ctx.fillStyle = island.color;
+    let depthScale = island.y / canvas.height;
+    let scale = 0.6 + depthScale * 0.4;
+
     ctx.beginPath();
     ctx.ellipse(
       island.x,
@@ -196,18 +188,33 @@ for (let i = 0; i < 80; i++) {
     );
     ctx.fill();
   }
-// STARS
-for (let s of stars) {
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-  ctx.fill();
-}
 
+  // stars
+  for (let s of stars) {
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // player shadow
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
+  ctx.beginPath();
+  ctx.ellipse(
+    player.x,
+    canvas.height - GROUND_HEIGHT + 10,
+    30,
+    8,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  // player
   drawPlayer();
 }
 
-// MAIN LOOP
 function gameLoop() {
   update();
   draw();
