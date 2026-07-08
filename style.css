@@ -1,0 +1,9 @@
+body {
+  margin: 0;
+  background: #cfe8ff; /* soft sky blue */
+  overflow: hidden;
+}
+
+#gameCanvas {
+  display: block;
+}
