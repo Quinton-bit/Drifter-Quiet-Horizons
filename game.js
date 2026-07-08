@@ -22,10 +22,17 @@ let player = {
   size: 20,
   onGround: false
 };
+let gameState = "start"; // "start" or "play"
+
 
 let keys = {};
 window.addEventListener("keydown", e => keys[e.key] = true);
 window.addEventListener("keyup", e => keys[e.key] = false);
+window.addEventListener("keydown", () => {
+  if (gameState === "start") {
+    gameState = "play";
+  }
+});
 
 let stars = [];
 for (let i = 0; i < 80; i++) {
@@ -114,6 +121,7 @@ function update() {
     island.x += Math.sin(Date.now() / 2000) * 0.1;
   }
 }
+
 
 function drawPlayer() {
   ctx.save();
