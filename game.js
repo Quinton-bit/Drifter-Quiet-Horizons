@@ -8,7 +8,7 @@ const GRAVITY = 0.4;
 const GROUND_HEIGHT = 120;
 
 // GAME STATE
-let gameState = "start"; // "start", "play", "gameover"
+let gameState = "start";
 let score = 0;
 let worldSpeed = 3;
 let difficultyTimer = 0;
@@ -18,11 +18,8 @@ let keys = {};
 window.addEventListener("keydown", e => {
   keys[e.key] = true;
 
-  if (gameState === "start" && e.key === " ") {
-    startGame();
-  } else if (gameState === "gameover" && e.key === " ") {
-    restartGame();
-  }
+  if (gameState === "start" && e.key === " ") startGame();
+  else if (gameState === "gameover" && e.key === " ") restartGame();
 });
 window.addEventListener("keyup", e => keys[e.key] = false);
 
@@ -41,7 +38,6 @@ function restartGame() {
   player.vy = 0;
   player.onGround = false;
   obstacles = [];
-  particles = [];
   startGame();
 }
 
@@ -59,7 +55,10 @@ let player = {
   speed: 0.2,
   friction: 0.90,
   size: 20,
-  onGround: false
+  onGround: false,
+
+  // FIXED HITBOX (matches fox model)
+  hitbox: { w: 50, h: 40 }
 };
 
 // BACKGROUND OBJECTS
@@ -108,13 +107,9 @@ function spawnObstacle() {
     x: canvas.width + w,
     y: groundY - h,
     w,
-    h,
-    color: "#c2410c"
+    h
   });
 }
-
-// PARTICLES (placeholder for next step)
-let particles = [];
 
 // UPDATE LOOP
 function update() {
@@ -150,14 +145,10 @@ function update() {
 
   // difficulty scaling
   difficultyTimer += 1;
-  if (difficultyTimer % 180 === 0) {
-    worldSpeed += 0.4;
-  }
+  if (difficultyTimer % 180 === 0) worldSpeed += 0.4;
 
   // spawn obstacles
-  if (Math.random() < 0.02) {
-    spawnObstacle();
-  }
+  if (Math.random() < 0.02) spawnObstacle();
 
   updateObstacles();
 
@@ -192,42 +183,118 @@ function updateBackground() {
   }
 }
 
-// DRAW PLAYER
+// 2.5D PLAYER MODEL
 function drawPlayer() {
   ctx.save();
 
-  ctx.fillStyle = "#a03320";
+  let bob = Math.sin(Date.now() / 200) * 2;
+  let stretch = 1 + Math.sin(Date.now() / 120) * 0.05;
 
-  // body
+  ctx.translate(player.x, player.y + bob);
+  ctx.scale(stretch, 1);
+
+  // SHADOW
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
-  ctx.ellipse(player.x, player.y, 20, 14, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 25, 28, 10, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // head
+  // GLOW
+  ctx.shadowColor = "#ffa866";
+  ctx.shadowBlur = 25;
+
+  // BODY
+  ctx.fillStyle = "#ff8c42";
   ctx.beginPath();
-  ctx.ellipse(player.x, player.y - 18, 14, 12, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 25, 18, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ears
+  ctx.shadowBlur = 0;
+
+  // OUTLINE
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // HEAD
+  ctx.fillStyle = "#ff8c42";
   ctx.beginPath();
-  ctx.moveTo(player.x - 10, player.y - 22);
-  ctx.lineTo(player.x - 4, player.y - 32);
-  ctx.lineTo(player.x + 0, player.y - 22);
+  ctx.ellipse(0, -22, 16, 14, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // EARS
+  ctx.beginPath();
+  ctx.moveTo(-10, -28);
+  ctx.lineTo(-4, -40);
+  ctx.lineTo(2, -28);
   ctx.fill();
 
   ctx.beginPath();
-  ctx.moveTo(player.x + 10, player.y - 22);
-  ctx.lineTo(player.x + 4, player.y - 32);
-  ctx.lineTo(player.x + 0, player.y - 22);
+  ctx.moveTo(10, -28);
+  ctx.lineTo(4, -40);
+  ctx.lineTo(-2, -28);
+  ctx.fill();
+
+  // TAIL
+  ctx.fillStyle = "#ffb46a";
+  ctx.beginPath();
+  ctx.ellipse(-30, 5, 20, 12, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
 }
-let scale = 1 + Math.sin(Date.now() / 100) * 0.05;
-ctx.scale(scale, 1);
 
-player.yBase = player.y;
-player.y = player.yBase + Math.sin(Date.now() / 200) * 2;
+// 2.5D OBSTACLE DRAW
+function drawObstacle(o) {
+  ctx.save();
+
+  // Depth shadow
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillRect(o.x + 10, o.y + o.h, o.w, 10);
+
+  // Main body
+  ctx.fillStyle = "#3a4a63";
+  ctx.fillRect(o.x, o.y, o.w, o.h);
+
+  // Outline
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 3;
+  ctx.strokeRect(o.x, o.y, o.w, o.h);
+
+  // Top highlight
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fillRect(o.x, o.y, o.w, 8);
+
+  ctx.restore();
+}
+
+// OBSTACLE UPDATE + FIXED COLLISION
+function updateObstacles() {
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const o = obstacles[i];
+    o.x -= worldSpeed;
+
+    if (o.x + o.w < 0) {
+      obstacles.splice(i, 1);
+      continue;
+    }
+
+    // FIXED HITBOX COLLISION
+    const px = player.x - player.hitbox.w / 2;
+    const py = player.y - player.hitbox.h / 2;
+    const pw = player.hitbox.w;
+    const ph = player.hitbox.h;
+
+    if (
+      px < o.x + o.w &&
+      px + pw > o.x &&
+      py < o.y + o.h &&
+      py + ph > o.y
+    ) {
+      gameState = "gameover";
+    }
+  }
+}
 
 // DRAW EVERYTHING
 function draw() {
@@ -286,24 +353,7 @@ function draw() {
   }
 
   // obstacles
-  for (let o of obstacles) {
-    ctx.fillStyle = o.color;
-    ctx.fillRect(o.x, o.y, o.w, o.h);
-  }
-
-  // shadow
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.beginPath();
-  ctx.ellipse(
-    player.x,
-    canvas.height - GROUND_HEIGHT + 10,
-    30,
-    8,
-    0,
-    0,
-    Math.PI * 2
-  );
-  ctx.fill();
+  for (let o of obstacles) drawObstacle(o);
 
   // player
   drawPlayer();
@@ -326,64 +376,6 @@ function draw() {
     ctx.fillText("You drifted: " + Math.floor(score) + " m", canvas.width / 2, canvas.height / 2 - 10);
     ctx.font = "20px system-ui, sans-serif";
     ctx.fillText("Press SPACE to try again", canvas.width / 2, canvas.height / 2 + 30);
-  }
-}function drawPlayer() {
-  // SHADOW
-  ctx.fillStyle = "rgba(0,0,0,0.3)";
-  ctx.beginPath();
-  ctx.ellipse(player.x, player.y + 20, 20, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // GLOW
-  ctx.shadowColor = "#ffa866";
-  ctx.shadowBlur = 25;
-
-  // BODY
-  ctx.fillStyle = "#ff8c42";
-  ctx.beginPath();
-  ctx.ellipse(player.x, player.y, 25, 18, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.shadowBlur = 0;
-
-  // OUTLINE
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // TAIL
-  ctx.fillStyle = "#ffb46a";
-  ctx.beginPath();
-  ctx.ellipse(player.x - 25, player.y + 5, 18, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
-}
-player.yBase = player.y;
-player.y = player.yBase + Math.sin(Date.now() / 200) * 2;
-
-
-// OBSTACLE UPDATE
-function updateObstacles() {
-  for (let i = obstacles.length - 1; i >= 0; i--) {
-    const o = obstacles[i];
-    o.x -= worldSpeed;
-
-    if (o.x + o.w < 0) {
-      obstacles.splice(i, 1);
-      continue;
-    }
-
-    const px = player.x;
-    const py = player.y;
-    const pr = player.size;
-
-    if (
-      px + pr > o.x &&
-      px - pr < o.x + o.w &&
-      py + pr > o.y &&
-      py - pr < o.y + o.h
-    ) {
-      gameState = "gameover";
-    }
   }
 }
 
