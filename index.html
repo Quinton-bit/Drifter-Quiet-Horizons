@@ -5,12 +5,16 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
   <canvas id="gameCanvas"></canvas>
+
+  <!-- Background Layers MUST be inside the body -->
+  <div id="bg-layer-1" class="bg-layer"></div>
+  <div id="bg-layer-2" class="bg-layer"></div>
+  <div id="bg-layer-3" class="bg-layer"></div>
+  <div id="foreground-ground"></div>
+  <div id="fog-overlay"></div>
+
   <script src="game.js"></script>
 </body>
 </html>
-<div id="bg-layer-1" class="bg-layer"></div>
-<div id="bg-layer-2" class="bg-layer"></div>
-<div id="bg-layer-3" class="bg-layer"></div>
-<div id="foreground-ground"></div>
-<div id="fog-overlay"></div>
